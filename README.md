@@ -34,7 +34,7 @@ API:
       
       BODY {username, password} 
       
-      RESPONSE 200 username
+      RESPONSE 201 username
       
       <img width="896" alt="Screenshot 2022-05-08 at 1 08 30 PM" src="https://user-images.githubusercontent.com/12572178/167289437-9cd43b0c-7c30-4c85-b5a8-2a73ca3e2931.png">
 
