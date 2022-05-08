@@ -1,4 +1,4 @@
-# Retail_Order_Assigment
+# Retail_Order_Assignment
 
 Designed order processing REST Api's using python based web framework Flask. A NoSQL database MongoDB was used since it performs better on CRUD operations compared to other NoSQL db's. A Kafka messaging queue is used to send the events to consumer groups. SSL is enabled.
 
