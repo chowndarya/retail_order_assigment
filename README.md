@@ -66,7 +66,8 @@ KAFKA_BROKER
      
 
 KAFKA_CONSUMER
-     DESCRIPTION receives the message event and processess the order . Updates the order status to PROCESSED.
+
+     DESCRIPTION receives the message event and processess the order. Updates the order status to PROCESSED.
      
      conda activate my_env
      
