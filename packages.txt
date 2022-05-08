@@ -1,0 +1,2 @@
+Installed Kafka broker on local
+Installed mongodb cluster on cloud with 3 replicaset  
