@@ -56,6 +56,78 @@ db = SQLAlchemy(app)
 auth = HTTPBasicAuth()
 
 
+@app.route('/orderdetails',methods=['GET'])
+@auth.login_required
+def getorderDetails():
+    data= request.get_json()
+
+    if 'orderid' in data:
+        filter={
+          'orderid': data['orderid']
+         }
+
+        result = client['retail_order']['order_tracker'].find_one(
+            filter=filter
+         )
+
+        for item in result:
+            print(item)
+
+        if result:
+            return jsonify(json.loads(json_util.dumps(result)))
+        else:
+            return jsonify("Order id not present in database. Please verify")
+    elif 'userid' in data:
+
+        filter={
+          'orderid': orderid
+         }
+
+        result = client['retail_order']['order_tracker'].find_many(
+            filter=filter
+         )
+
+
+        if result:
+            return jsonify(json.loads(json_util.dumps(result)))
+        else:
+            return jsonify("User have not placed any orders")
+    else:
+        return jsonify("Atleast one of the argument orderid or userid required to process")
+
+
+#design pattern - circuit breaker
+
+@circuit(failure_threshold=10, expected_exception=ConnectionError)
+@app.route('/order',methods=['POST'])
+def placeorder():
+    # create a record in elasticsearch
+    data= request.get_json()
+
+    #validation_step
+    mandatory_keys = ['userid','cost','orderitems']
+    for keyname in mandatory_keys:
+        if keyname not in data:
+            return jsonify(keyname +"is a mandatory argument. Please pass on the value.")
+
+
+
+    latest_timestamp = dt.now().isoformat('T')
+    orderid = str(uuid.uuid4())
+
+    mongo_doc = {"userid": data['userid'], "orderid":orderid, "orderstatus":"PLACED", "timestamp":latest_timestamp, "cost":data['cost'], "orderitems":data['orderitems'] }
+
+    try:
+        result = client['retail_order']['order_tracker'].insert_one(json.loads(json_util.dumps(mongo_doc)))
+        print ("created the entry successfully")
+    except Exception as e:
+        print (e)
+
+
+    #send to kafka producer
+    producer.send('order_details', mongo_doc)
+
+    return jsonify("Order placed. Your reference number: " + str(orderid))
 
 
 @app.before_first_request
@@ -129,91 +201,14 @@ def get_user(id):
     return jsonify({'username': user.username})
 
 
-@app.route('/api/token')
+@app.route('/api/token', methods=['GET'])
 @auth.login_required
 def get_auth_token():
     token = g.user.generate_auth_token(600)
     return jsonify({'token': token.decode('ascii'), 'duration': 600})
 
-
-#design pattern - circuit breaker
-
-@circuit(failure_threshold=10, expected_exception=ConnectionError)
-@app.route('/order',methods=['POST'])
-def placeorder():
-    # create a record in elasticsearch
-    data= request.get_json()
- 
-    #validation_step
-    mandatory_keys = ['userid','cost','orderitems'] 
-    for keyname in mandatory_keys:
-        if keyname not in data:
-            return jsonify(keyname +"is a mandatory argument. Please pass on the value.")
-
-
-
-    latest_timestamp = dt.now().isoformat('T')
-    orderid = str(uuid.uuid4())       
-
-    mongo_doc = {"userid": data['userid'], "orderid":orderid, "orderstatus":"PLACED", "timestamp":latest_timestamp, "cost":data['cost'], "orderitems":data['orderitems'] }
-    
-    # Add any retry mechanism
-    try:
-        result = client['retail_order']['order_tracker'].insert_one(json.loads(json_util.dumps(mongo_doc)))
-        print ("created the entry successfully")
-    except Exception as e:
-        print (e)
-        # handle error messages to return to customer
-    
-    #send to kafka producer
-    producer.send('order_details', mongo_doc)
-
-    return jsonify("Order placed. Your reference number: " + str(orderid))    
-   
-
-@app.route('/orderdetails',methods=['GET'])
-@auth.login_required
-def getorderDetails():
-    # diffent query params
-    data= request.get_json()
-
-    if 'orderid' in data:
-        filter={
-          'orderid': data['orderid']
-         }
-
-        result = client['retail_order']['order_tracker'].find_one(
-            filter=filter
-         )
-
-        for item in result:
-            print(item)
-
-        if result:
-            return jsonify(json.loads(json_util.dumps(result)))
-        else:
-            return jsonify("Order id not present in database. Please verify")
-    elif 'userid' in data:
-
-        filter={
-          'orderid': orderid
-         }
-
-        result = client['retail_order']['order_tracker'].find_many(
-            filter=filter
-         )
-
-
-        if result:
-            return jsonify(json.loads(json_util.dumps(result)))
-        else:
-            return jsonify("User have not placed any orders")
-    else:
-        return jsonify("Atleast one of the argument orderid or userid required to process")
-
-
  
 if __name__ == "__main__":
     if not os.path.exists('db.sqlite'):
         db.create_all()
-    app.run(host='0.0.0.0', port=5009, debug=True, use_reloader=True, threaded=True,ssl_context=('server.crt','server.key')) 
+    app.run(host='0.0.0.0', port=5008, debug=True, use_reloader=True, threaded=True,ssl_context=('server.crt','server.key')) 
