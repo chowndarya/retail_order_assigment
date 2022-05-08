@@ -2,11 +2,26 @@ from flask import Flask,request, jsonify, Response, g, url_for, abort
 app = Flask(__name__)
 import json
 
+#configuration file
+import configparser
+
+CONFIG = configparser.ConfigParser()
+CONF_PATH = 'config/db.conf'
+CONFIG.read(CONF_PATH)
+mongousername = CONFIG.get('Mongo','username')
+mongopass = CONFIG.get('Mongo','password')
+mongodatabase = CONFIG.get('Mongo','database')
+
+sqlite_secret_key =  CONFIG.get('Sqlite','secret_key')
+kafka_host = CONFIG.get('Kafka','hostname')
+kafka_port = CONFIG.get('Kafka','port')
+
+
 #Nosql database
 from pymongo import MongoClient
-
-client = MongoClient('mongodb://chownv:firstmongocluster@cluster0-shard-00-00.qtb4k.mongodb.net:27017,cluster0-shard-00-01.qtb4k.mongodb.net:27017,cluster0-shard-00-02.qtb4k.mongodb.net:27017/retail_order?ssl=true&replicaSet=atlas-73uabp-shard-0&authSource=admin&retryWrites=true&w=majority')
+client = MongoClient('mongodb://'+mongousername+':'+mongopass+'@cluster0-shard-00-00.qtb4k.mongodb.net:27017,cluster0-shard-00-01.qtb4k.mongodb.net:27017,cluster0-shard-00-02.qtb4k.mongodb.net:27017/'+ mongodatabase +'?ssl=true&replicaSet=atlas-73uabp-shard-0&authSource=admin&retryWrites=true&w=majority')
 from bson import json_util, ObjectId
+
 
 #Queue system
 from kafka.producer import KafkaProducer
@@ -26,12 +41,12 @@ from time import sleep
 import os
 
 
-#Authetication
+#Authentication
 from flask_sqlalchemy import SQLAlchemy
 from flask_httpauth import HTTPBasicAuth
 import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
-app.config['SECRET_KEY'] = 'the quick brown fox jumps over the lazy dog'
+app.config['SECRET_KEY'] = sqlite_secret_key
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite'
 app.config['SQLALCHEMY_COMMIT_ON_TEARDOWN'] = True
 
@@ -39,6 +54,9 @@ app.config['SQLALCHEMY_COMMIT_ON_TEARDOWN'] = True
 # extensions
 db = SQLAlchemy(app)
 auth = HTTPBasicAuth()
+
+
+
 
 @app.before_first_request
 def create_tables():
@@ -117,19 +135,8 @@ def get_auth_token():
     token = g.user.generate_auth_token(600)
     return jsonify({'token': token.decode('ascii'), 'duration': 600})
 
-"""
-@app.route('/api/resource')
-@auth.login_required
-def get_resource():
-    return jsonify({'data': 'Hello, %s!' % g.user.username})
-
-@app.route('/')
-def hello_world():
-    return "Hello Chow"
-"""
 
 #design pattern - circuit breaker
-
 
 @circuit(failure_threshold=10, expected_exception=ConnectionError)
 @app.route('/order',methods=['POST'])
@@ -209,4 +216,4 @@ def getorderDetails():
 if __name__ == "__main__":
     if not os.path.exists('db.sqlite'):
         db.create_all()
-    app.run(host='0.0.0.0', port=5008, debug=True, use_reloader=True, threaded=True,ssl_context=('server.crt','server.key')) 
+    app.run(host='0.0.0.0', port=5009, debug=True, use_reloader=True, threaded=True,ssl_context=('server.crt','server.key')) 

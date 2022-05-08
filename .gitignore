@@ -1,0 +1,6 @@
+#Ignore the ssl certificates
+server.crt
+server.key
+
+#ignore sqlite
+db.sqlite
